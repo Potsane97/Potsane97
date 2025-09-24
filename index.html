@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Whiteboard + Draggable Calculator</title>
+  <style>
+    body {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 20px;
+    }
+    #board {
+      border: 2px solid #000;
+      cursor: crosshair;
+      background: #fff;
+      touch-action: none;
+    }
+    .toolbar {
+      margin: 15px;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+    /* Calculator popup */
+    .calculator {
+      position: absolute;
+      top: 100px;
+      left: 100px;
+      width: 320px;
+      background: #fff;
+      border: 2px solid #000;
+      border-radius: 8px;
+      text-align: center;
+      display: none; /* hidden by default */
+      box-shadow: 4px 4px 10px rgba(0,0,0,0.3);
+    }
+    .calc-header {
+      background: #333;
+      color: #fff;
+      padding: 8px;
+      cursor: move;
+      font-weight: bold;
+      text-align: left;
+    }
+    .calc-content {
+      padding: 10px;
+    }
+    .calculator input {
+      width: 260px;
+      font-size: 18px;
+      margin-bottom: 10px;
+      padding: 5px;
+    }
+    .calculator button {
+      margin: 3px;
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h2>Whiteboard with Draggable Calculator</h2>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <label>Color: <input type="color" id="colorPicker" value="#000000"></label>
+    <label>Thickness: <input type="range" id="thickness" min="1" max="20" value="2"></label>
+    <button onclick="clearBoard()">Clear</button>
+    <button onclick="downloadPDF()">Save as PDF</button>
+    <button onclick="toggleCalculator()">Calculator</button>
+  </div>
+
+  <!-- Whiteboard -->
+  <canvas id="board" width="800" height="500"></canvas>
+
+  <!-- Calculator Popup -->
+  <div id="calcContainer" class="calculator">
+    <div class="calc-header" id="calcHeader">Scientific Calculator ✖</div>
+    <div class="calc-content">
+      <input type="text" id="calcInput">
+      <button onclick="calculate()">=</button>
+      <br>
+      <button onclick="append('sin(')">sin</button>
+      <button onclick="append('cos(')">cos</button>
+      <button onclick="append('tan(')">tan</button>
+      <button onclick="append('sqrt(')">√</button>
+      <button onclick="append('^')">^</button>
+      <br>
+      <button onclick="append('7')">7</button>
+      <button onclick="append('8')">8</button>
+      <button onclick="append('9')">9</button>
+      <br>
+      <button onclick="append('4')">4</button>
+      <button onclick="append('5')">5</button>
+      <button onclick="append('6')">6</button>
+      <br>
+      <button onclick="append('1')">1</button>
+      <button onclick="append('2')">2</button>
+      <button onclick="append('3')">3</button>
+      <br>
+      <button onclick="append('0')">0</button>
+      <button onclick="append('+')">+</button>
+      <button onclick="append('-')">-</button>
+      <br>
+      <button onclick="append('*')">*</button>
+      <button onclick="append('/')">/</button>
+      <button onclick="clearCalc()">C</button>
+    </div>
+  </div>
+
+  <!-- Libraries -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/11.11.0/math.min.js"></script>
+
+  <script>
+    // ---------------- Whiteboard ----------------
+    const canvas = document.getElementById('board');
+    const ctx = canvas.getContext('2d');
+    let drawing = false;
+    let penColor = document.getElementById('colorPicker').value;
+    let penThickness = document.getElementById('thickness').value;
+
+    document.getElementById('colorPicker').addEventListener('input', e => penColor = e.target.value);
+    document.getElementById('thickness').addEventListener('input', e => penThickness = e.target.value);
+
+    canvas.addEventListener('mousedown', startDrawing);
+    canvas.addEventListener('mouseup', stopDrawing);
+    canvas.addEventListener('mousemove', draw);
+
+    canvas.addEventListener('touchstart', startDrawing);
+    canvas.addEventListener('touchend', stopDrawing);
+    canvas.addEventListener('touchmove', draw);
+
+    function getXY(e) {
+      if (e.touches) {
+        return {
+          x: e.touches[0].clientX - canvas.getBoundingClientRect().left,
+          y: e.touches[0].clientY - canvas.getBoundingClientRect().top
+        };
+      } else {
+        return { x: e.offsetX, y: e.offsetY };
+      }
+    }
+
+    function startDrawing(e) {
+      drawing = true;
+      ctx.beginPath();
+      const { x, y } = getXY(e);
+      ctx.moveTo(x, y);
+    }
+
+    function stopDrawing() {
+      drawing = false;
+    }
+
+    function draw(e) {
+      if (!drawing) return;
+      e.preventDefault();
+      const { x, y } = getXY(e);
+      ctx.lineWidth = penThickness;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = penColor;
+      ctx.lineTo(x, y);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+    }
+
+    function clearBoard() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function downloadPDF() {
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+      const imgData = canvas.toDataURL("image/png", 1.0);
+      pdf.addImage(imgData, "PNG", 10, 10, 180, 120);
+      pdf.save("whiteboard.pdf");
+    }
+
+    // ---------------- Calculator ----------------
+    function append(val) {
+      document.getElementById('calcInput').value += val;
+    }
+    function calculate() {
+      try {
+        const expr = document.getElementById('calcInput').value;
+        const result = math.evaluate(expr);
+        document.getElementById('calcInput').value = result;
+      } catch (e) {
+        alert("Invalid Expression");
+      }
+    }
+    function clearCalc() {
+      document.getElementById('calcInput').value = '';
+    }
+    function toggleCalculator() {
+      const calc = document.getElementById('calcContainer');
+      calc.style.display = (calc.style.display === "none" || calc.style.display === "") ? "block" : "none";
+    }
+
+    // ---------------- Draggable Popup ----------------
+    dragElement(document.getElementById("calcContainer"));
+
+    function dragElement(el) {
+      const header = document.getElementById("calcHeader");
+      let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
+      header.onmousedown = dragMouseDown;
+
+      function dragMouseDown(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        document.onmouseup = closeDragElement;
+        document.onmousemove = elementDrag;
+      }
+
+      function elementDrag(e) {
+        e = e || window.event;
+        e.preventDefault();
+        pos1 = pos3 - e.clientX;
+        pos2 = pos4 - e.clientY;
+        pos3 = e.clientX;
+        pos4 = e.clientY;
+        el.style.top = (el.offsetTop - pos2) + "px";
+        el.style.left = (el.offsetLeft - pos1) + "px";
+      }
+
+      function closeDragElement() {
+        document.onmouseup = null;
+        document.onmousemove = null;
+      }
+    }
+
+    // Close calculator when ✖ is clicked in header
+    document.getElementById("calcHeader").addEventListener("click", () => {
+      toggleCalculator();
+    });
+  </script>
+</body>
+</html>
